@@ -230,6 +230,10 @@
     <string name="delete_swipe_letters">Letters</string>
     <!-- "delete_swipe" option to delete entire words by swiping. -->
     <string name="delete_swipe_words">Words</string>
+    <!-- Preferences item for the delete slider -->
+    <string name="delete_slider">Delete slider</string>
+    <!-- Description for "delete_slider" option. -->
+    <string name="delete_slider_summary">Hold the delete key for a second to turn it into a slider: slide left to delete faster, slide right to bring deleted text back</string>
     <!-- Preferences item and dialog title for backup and restore -->
     <string name="backup_restore_title">Backup and restore</string>
     <!-- Message for backup and restore dialog -->

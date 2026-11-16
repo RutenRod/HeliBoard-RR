@@ -123,6 +123,15 @@ public interface KeyboardActionListener {
 
     void onMoveDeletePointer(int steps);
     void onUpWithDeletePointerActive();
+
+    /** The delete slider appeared. Returns the number of characters that can be restored. */
+    int onDeleteSliderStart();
+    /**
+     * Delete (steps &gt; 0) or restore (steps &lt; 0) characters while the delete slider is used.
+     * Returns the number of characters that can still be restored.
+     */
+    int onDeleteSliderStep(int steps);
+    void onDeleteSliderEnd();
     void resetMetaState();
 
     KeyboardActionListener EMPTY_LISTENER = new Adapter();
@@ -181,6 +190,12 @@ public interface KeyboardActionListener {
         public void onMoveDeletePointer(int steps) {}
         @Override
         public void onUpWithDeletePointerActive() {}
+        @Override
+        public int onDeleteSliderStart() { return 0; }
+        @Override
+        public int onDeleteSliderStep(int steps) { return 0; }
+        @Override
+        public void onDeleteSliderEnd() {}
         @Override
         public void resetMetaState() {}
     }

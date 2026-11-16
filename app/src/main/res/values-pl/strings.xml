@@ -555,4 +555,6 @@
     <string name="subtype_tok">Toki Pona</string>
     <string name="layout_dpad" tools:keep="@string/layout_dpad">D-pad</string>
     <string name="space_swipe_toggle_dpad_entry">Przełącz na D-pad</string>
+    <string name="delete_slider">Suwak usuwania</string>
+    <string name="delete_slider_summary">Przytrzymaj klawisz usuwania przez sekundę, aby zamienić go w suwak: przesuń w lewo, aby usuwać szybciej, w prawo, aby przywrócić usunięty tekst</string>
 </resources>

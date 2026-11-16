@@ -24,6 +24,7 @@ import helium314.keyboard.latin.common.Constants
 import helium314.keyboard.latin.common.InputPointers
 import helium314.keyboard.latin.common.WordBreakIterator
 import helium314.keyboard.latin.common.combiningRange
+import helium314.keyboard.latin.common.lastGraphemeLength
 import helium314.keyboard.latin.common.stepsToCharCount
 import helium314.keyboard.latin.inputlogic.InputLogic
 import helium314.keyboard.latin.settings.Settings
@@ -280,6 +281,60 @@ class KeyboardActionListenerImpl(private val latinIME: LatinIME, private val inp
         if (!connection.hasSelection()) return
         inputLogic.finishInput()
         onCodeInput(KeyCode.DELETE, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
+    }
+
+    // text removed by the delete slider, most recently removed last, one grapheme (or one selection) per entry
+    private val sliderDeletedText = ArrayList<String>()
+
+    override fun onDeleteSliderStart(): Int {
+        sliderDeletedText.clear()
+        performHapticFeedback(HapticEvent.KEY_LONG_PRESS)
+        inputLogic.finishInput()
+        if (connection.hasSelection()) {
+            val selected = connection.getSelectedText(0)?.toString()
+            onCodeInput(KeyCode.DELETE, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
+            if (!selected.isNullOrEmpty() && !connection.hasSelection())
+                sliderDeletedText.add(selected)
+        }
+        return sliderDeletedText.size
+    }
+
+    override fun onDeleteSliderStep(steps: Int): Int {
+        if (steps > 0) {
+            var wordBoundary = false
+            connection.beginBatchEdit()
+            for (i in 0 until steps) {
+                val before = connection.getTextBeforeCursor(32, 0)
+                if (before.isNullOrEmpty()) break
+                val length = before.lastGraphemeLength.coerceIn(1, before.length)
+                val removed = before.subSequence(before.length - length, before.length).toString()
+                connection.deleteTextBeforeCursor(length)
+                if (removed.isBlank() && sliderDeletedText.lastOrNull()?.isBlank() == false)
+                    wordBoundary = true
+                sliderDeletedText.add(removed)
+            }
+            connection.endBatchEdit()
+            if (wordBoundary) performHapticFeedback(HapticEvent.GESTURE_MOVE)
+        } else if (steps < 0 && sliderDeletedText.isNotEmpty()) {
+            val restored = StringBuilder()
+            var wordBoundary = false
+            for (i in 0 until minOf(-steps, sliderDeletedText.size)) {
+                val text = sliderDeletedText.removeAt(sliderDeletedText.lastIndex)
+                if (text.isBlank()) wordBoundary = true
+                restored.append(text)
+            }
+            connection.beginBatchEdit()
+            connection.commitText(restored, 1)
+            connection.endBatchEdit()
+            if (wordBoundary) performHapticFeedback(HapticEvent.GESTURE_MOVE)
+        }
+        return sliderDeletedText.size
+    }
+
+    override fun onDeleteSliderEnd() {
+        sliderDeletedText.clear()
+        inputLogic.restartSuggestionsOnWordTouchedByCursor(settings.current)
+        keyboardSwitcher.updateShiftState(latinIME.currentAutoCapsState, latinIME.currentRecapitalizeState)
     }
 
     override fun resetMetaState() {

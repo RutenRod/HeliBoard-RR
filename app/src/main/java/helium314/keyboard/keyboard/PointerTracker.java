@@ -736,6 +736,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             startRepeatKey(key);
             startLongPressTimer(key);
             setPressedKeyGraphics(key, eventTime);
+            if (key.getCode() == KeyCode.DELETE && DeleteSlider.isEnabled() && !sInGesture) {
+                DeleteSlider.onDown(this, key, x,
+                        sDrawingProxy instanceof android.view.View view ? view : null, sListener);
+            }
             mStartX = x;
             mStartY = y;
             mStartTime = SystemClock.elapsedRealtime();
@@ -985,6 +989,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
                 if (!mInHorizontalSwipe) {
                     sTimerProxy.cancelKeyTimersOf(this);
                     mInHorizontalSwipe = true;
+                    DeleteSlider.cancel();
                 }
                 mStartX += steps * sPointerStep;
                 sListener.onMoveDeletePointer(steps);
@@ -994,6 +999,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
 
     private void onMoveEventInternal(final int x, final int y, final long eventTime) {
         final Key oldKey = mCurrentKey;
+
+        if (DeleteSlider.onMove(this, x)) {
+            return;
+        }
 
         // todo (later): move key swipe stuff to KeyboardActionListener (and finally extend it)
         if (mKeySwipeAllowed) {
@@ -1066,6 +1075,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
 
     private void onUpEventInternal(final int x, final int y, final long eventTime) {
         sTimerProxy.cancelKeyTimersOf(this);
+        DeleteSlider.onUp(this);
         final boolean isInDraggingFinger = mIsInDraggingFinger;
         final boolean isInSlidingKeyInput = mIsInSlidingKeyInput;
         resetKeySelectionByDraggingFinger();
@@ -1220,6 +1230,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
 
     private void onCancelEventInternal() {
         sTimerProxy.cancelKeyTimersOf(this);
+        DeleteSlider.onUp(this);
         setReleasedKeyGraphics(mCurrentKey, true);
         resetKeySelectionByDraggingFinger();
         dismissPopupKeysPanel();
@@ -1266,6 +1277,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         if (sInGesture) return;
         if (key == null) return;
         if (!key.isLongPressEnabled()) return;
+        if (key.getCode() == KeyCode.DELETE && DeleteSlider.isEnabled()) return;
         // Caveat: Please note that isLongPressEnabled() can be true even if the current key
         // doesn't have its popup keys. (e.g. spacebar, globe key) If we are in the dragging finger
         // mode, we will disable long press timer of such key.
@@ -1322,10 +1334,33 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         callListenerOnRelease(key, code, false);
     }
 
+    /**
+     * Called by {@link DeleteSlider} when the delete key was held long enough.
+     * @return whether this pointer is still holding the delete key, i.e. the slider may start
+     */
+    public boolean onDeleteSliderActivated() {
+        final Key key = getKey();
+        if (key == null || key.getCode() != KeyCode.DELETE || mIsTrackingForActionDisabled
+                || mInHorizontalSwipe || sInGesture || isShowingPopupKeysPanel()) {
+            return false;
+        }
+        sTimerProxy.cancelKeyTimersOf(this);
+        // same state as a repeating key: no gesture, no key swipe, and no extra delete on release
+        mCurrentRepeatingKeyCode = KeyCode.DELETE;
+        if (mKeySwipeAllowed) {
+            mKeySwipeAllowed = false;
+            sInKeySwipe = false;
+        }
+        mIsDetectingGesture = false;
+        return true;
+    }
+
     private void startRepeatKey(final Key key) {
         if (sInGesture) return;
         if (key == null) return;
         if (!key.isRepeatable()) return;
+        // the delete slider replaces key repeat on the delete key
+        if (key.getCode() == KeyCode.DELETE && DeleteSlider.isEnabled()) return;
         // Don't start key repeat when we are in the dragging finger mode.
         if (mIsInDraggingFinger) return;
         final int startRepeatCount = 1;
