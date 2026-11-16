@@ -34,7 +34,13 @@ object LearnedWords {
     fun list(context: Context, locale: Locale): List<Entry> {
         val result = ArrayList<Entry>()
         try {
-            UserHistoryDictionary.getDictionary(context, locale).forEachWord { word, strength -> result.add(Entry(word, strength)) }
+            val dictionary = UserHistoryDictionary.getDictionary(context, locale)
+            dictionary.forEachWord { word, strength -> result.add(Entry(word, strength)) }
+            if (result.isEmpty()) {
+                // the dictionary is loaded in background, it might not have been ready
+                Thread.sleep(400)
+                dictionary.forEachWord { word, strength -> result.add(Entry(word, strength)) }
+            }
         } catch (e: Throwable) {
             Log.w(TAG, "could not list learned words for $locale", e)
         }
