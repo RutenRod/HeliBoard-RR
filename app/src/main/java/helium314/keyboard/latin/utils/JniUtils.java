@@ -40,6 +40,14 @@ public final class JniUtils {
     }
 
     public static boolean sHaveGestureLib = false;
+
+    /**
+     * Gesture typing is always possible: with a loaded gesture library if there is one,
+     * otherwise with the built-in swipe typing (see helium314.keyboard.latin.swipe).
+     */
+    public static boolean hasGestureSupport() {
+        return true;
+    }
     static {
         // hardcoded default path, may not work on all phones
         @SuppressLint("SdCardPath") String filesDir = "/data/data/" + BuildConfig.APPLICATION_ID + "/files";

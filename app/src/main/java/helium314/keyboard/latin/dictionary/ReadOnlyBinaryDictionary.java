@@ -122,6 +122,29 @@ public final class ReadOnlyBinaryDictionary extends Dictionary {
     }
 
     @Override
+    public void forEachWord(final WordConsumer consumer) {
+        mLock.readLock().lock();
+        try {
+            if (mBinaryDictionary.isValidDictionary())
+                mBinaryDictionary.forEachWord(consumer);
+        } finally {
+            mLock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public int getNgramProbability(final NgramContext ngramContext, final String word) {
+        if (mLock.readLock().tryLock()) {
+            try {
+                return mBinaryDictionary.getNgramProbability(ngramContext, word);
+            } finally {
+                mLock.readLock().unlock();
+            }
+        }
+        return NOT_A_PROBABILITY;
+    }
+
+    @Override
     public void close() {
         mLock.writeLock().lock();
         try {

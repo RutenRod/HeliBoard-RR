@@ -32,6 +32,9 @@ import helium314.keyboard.latin.settings.SettingsValuesForSuggestion
 import helium314.keyboard.latin.suggestions.SuggestedWords
 import helium314.keyboard.latin.suggestions.SuggestedWordInfo
 import helium314.keyboard.latin.suggestions.SuggestionResults
+import helium314.keyboard.latin.swipe.SwipeDecoder
+import helium314.keyboard.latin.swipe.SwipeTyping
+import helium314.keyboard.latin.utils.JniUtils
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.getSecondaryLocales
@@ -503,6 +506,8 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         composedData: ComposedData, ngramContext: NgramContext, keyboard: Keyboard,
         settingsValuesForSuggestion: SettingsValuesForSuggestion, sessionId: Int, inputStyle: InputStyle
     ): SuggestionResults {
+        if (composedData.mIsBatchMode && !JniUtils.sHaveGestureLib)
+            return getSwipeSuggestionResults(composedData, ngramContext, keyboard, settingsValuesForSuggestion)
         val proximityInfoHandle = keyboard.proximityInfo.nativeProximityInfo
         val weightOfLangModelVsSpatialModel = floatArrayOf(Dictionary.NOT_A_WEIGHT_OF_LANG_MODEL_VS_SPATIAL_MODEL)
 
@@ -529,6 +534,51 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
         includeAtLeastTwoWordSuggestions(suggestionResults, suggestionsArray, composedData.mTypedWord)
 
+        return suggestionResults
+    }
+
+    /** Suggestions for a swipe from the built-in swipe typing, used when no gesture typing library is loaded. */
+    private fun getSwipeSuggestionResults(
+        composedData: ComposedData, ngramContext: NgramContext, keyboard: Keyboard,
+        settingsValuesForSuggestion: SettingsValuesForSuggestion
+    ): SuggestionResults {
+        val suggestionResults = SuggestionResults(SuggestedWords.MAX_SUGGESTIONS, ngramContext, false)
+        val pointers = composedData.mInputPointers
+        val useContext = ngramContext.isValid
+        for (dictGroup in dictionaryGroups) {
+            if (dictGroup.swipeTyping.needsDynamicWordsRefresh()) {
+                val dynamicDicts = DictionaryFacilitator.DYNAMIC_DICTIONARY_TYPES.mapNotNull { dictGroup.getSubDict(it) }
+                scope.launch { dictGroup.swipeTyping.refreshDynamicWords(dynamicDicts) }
+            }
+            val candidates = dictGroup.swipeTyping.decode(keyboard, pointers.xCoordinates, pointers.yCoordinates, pointers.pointerSize)
+            if (candidates.isEmpty()) continue
+            val mainDict = dictGroup.getDict(Dictionary.TYPE_MAIN)
+            val historyDict = dictGroup.getSubDict(Dictionary.TYPE_USER_HISTORY)
+            val sourceDict = mainDict ?: historyDict ?: Dictionary.DICTIONARY_USER_TYPED
+            // words of the less likely languages need to match better when typing in more than one language
+            val localePenalty = (1f - dictGroup.getWeightForLocale(dictionaryGroups, true)) * 40f
+            val seenWords = HashSet<String>()
+            for (candidate in candidates) {
+                val word = candidate.word
+                if (!seenWords.add(word) || isBlacklisted(word)) continue
+                if (settingsValuesForSuggestion.mBlockPotentiallyOffensive
+                    && mainDict?.getWordProperty(word, false)?.mIsPossiblyOffensive == true)
+                    continue
+                var score = candidate.score - localePenalty
+                if (useContext) {
+                    // a word the user wrote after the previous words before is more likely than its general frequency says
+                    val learned = historyDict?.getNgramProbability(ngramContext, word) ?: Dictionary.NOT_A_PROBABILITY
+                    val general = mainDict?.getNgramProbability(ngramContext, word) ?: Dictionary.NOT_A_PROBABILITY
+                    val inContext = maxOf(learned, general)
+                    if (inContext > candidate.frequency)
+                        score += (inContext - candidate.frequency) * SwipeDecoder.FREQUENCY_LOG_STEP
+                    if (learned != Dictionary.NOT_A_PROBABILITY)
+                        score += SWIPE_LEARNED_CONTEXT_BONUS
+                }
+                suggestionResults.add(SuggestedWordInfo(word, "", SwipeTyping.toSuggestionScore(score),
+                    SuggestedWordInfo.KIND_CORRECTION, sourceDict, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE))
+            }
+        }
         return suggestionResults
     }
 
@@ -622,6 +672,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         // HACK: This threshold is being used when adding a capitalized entry in the User History dictionary.
         private const val CAPITALIZED_FORM_MAX_PROBABILITY_FOR_INSERT = 140
 
+        // added to the swipe typing score of a word the user has written after the same previous words before
+        private const val SWIPE_LEARNED_CONTEXT_BONUS = 2f
+
         private fun createSubDict(
             dictType: String, context: Context, locale: Locale, dictFile: File?, dictNamePrefix: String
         ): ExpandableBinaryDictionary? {
@@ -708,6 +761,17 @@ private class DictionaryGroup(
     context: Context? = null
 ) {
     private val subDicts: ConcurrentHashMap<String, ExpandableBinaryDictionary> = ConcurrentHashMap(subDicts)
+
+    val swipeTyping = SwipeTyping()
+
+    init {
+        loadSwipeWords(mainDict)
+    }
+
+    private fun loadSwipeWords(dict: Dictionary?) {
+        if (JniUtils.sHaveGestureLib) return // the library does gesture typing, no need to keep our own word list
+        swipeScope.launch { swipeTyping.loadMainDictionary(dict) }
+    }
 
     /** Removes a word from all dictionaries in this group. If the word is in a read-only dictionary, it is blacklisted. */
     fun removeWord(word: String) {
@@ -844,6 +908,7 @@ private class DictionaryGroup(
         mainDict = newMainDict
         if (oldDict != null && newMainDict !== oldDict)
             oldDict.close()
+        loadSwipeWords(newMainDict)
     }
 
     fun getDict(dictType: String): Dictionary? {
@@ -876,5 +941,6 @@ private class DictionaryGroup(
     companion object {
         private val TAG = DictionaryGroup::class.java.simpleName
         const val MAX_CONFIDENCE = 2
+        private val swipeScope = CoroutineScope(Dispatchers.Default)
     }
 }

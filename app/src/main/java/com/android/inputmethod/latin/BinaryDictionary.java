@@ -363,6 +363,7 @@ public final class BinaryDictionary extends Dictionary {
         return getNgramProbability(ngramContext, word) != NOT_A_PROBABILITY;
     }
 
+    @Override
     public int getNgramProbability(final NgramContext ngramContext, final String word) {
         if (!ngramContext.isValid() || TextUtils.isEmpty(word)) {
             return NOT_A_PROBABILITY;
@@ -404,6 +405,27 @@ public final class BinaryDictionary extends Dictionary {
                 outNgramPrevWordsArray, outNgramPrevWordIsBeginningOfSentenceArray,
                 outNgramTargets, outNgramProbabilityInfo, outShortcutTargets,
                 outShortcutProbabilities);
+    }
+
+    /** Lists all words with their unigram probability, much lighter than using {@link #getNextWordProperty(int)}. */
+    @Override
+    public void forEachWord(final WordConsumer consumer) {
+        if (!isValidDictionary()) return;
+        final int[] codePoints = new int[DICTIONARY_MAX_WORD_LENGTH];
+        final boolean[] isBeginningOfSentence = new boolean[1];
+        int token = 0;
+        do {
+            java.util.Arrays.fill(codePoints, 0);
+            token = getNextWordNative(mNativeDict, token, codePoints, isBeginningOfSentence);
+            if (isBeginningOfSentence[0]) continue;
+            int length = 0;
+            while (length < codePoints.length && codePoints[length] != 0) length++;
+            if (length == 0) continue;
+            final int[] wordCodePoints = java.util.Arrays.copyOf(codePoints, length);
+            final int probability = getProbabilityNative(mNativeDict, wordCodePoints);
+            if (probability == NOT_A_PROBABILITY) continue;
+            consumer.accept(new String(wordCodePoints, 0, length), probability);
+        } while (token != 0);
     }
 
     public static class GetNextWordPropertyResult {

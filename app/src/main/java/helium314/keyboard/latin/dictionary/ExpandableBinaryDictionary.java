@@ -173,6 +173,44 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
         return NOT_A_PROBABILITY;
     }
 
+    @Override
+    public void forEachWord(final WordConsumer consumer) {
+        reloadDictionaryIfRequired();
+        boolean lockAcquired = false;
+        try {
+            lockAcquired = mLock.readLock().tryLock(
+                    10 * TIMEOUT_FOR_READ_OPS_IN_MILLISECONDS, TimeUnit.MILLISECONDS);
+            if (lockAcquired && mBinaryDictionary != null) {
+                mBinaryDictionary.forEachWord(consumer);
+            }
+        } catch (final InterruptedException e) {
+            Log.e(TAG, "Interrupted tryLock() in forEachWord().", e);
+        } finally {
+            if (lockAcquired) {
+                mLock.readLock().unlock();
+            }
+        }
+    }
+
+    @Override
+    public int getNgramProbability(final NgramContext ngramContext, final String word) {
+        boolean lockAcquired = false;
+        try {
+            lockAcquired = mLock.readLock().tryLock(
+                    TIMEOUT_FOR_READ_OPS_IN_MILLISECONDS, TimeUnit.MILLISECONDS);
+            if (lockAcquired && mBinaryDictionary != null) {
+                return mBinaryDictionary.getNgramProbability(ngramContext, word);
+            }
+        } catch (final InterruptedException e) {
+            Log.e(TAG, "Interrupted tryLock() in getNgramProbability().", e);
+        } finally {
+            if (lockAcquired) {
+                mLock.readLock().unlock();
+            }
+        }
+        return NOT_A_PROBABILITY;
+    }
+
     void closeBinaryDictionary() {
         if (mBinaryDictionary != null) {
             mBinaryDictionary.close();

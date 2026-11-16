@@ -184,6 +184,25 @@ public abstract class Dictionary {
         return null;
     }
 
+    /** Receives the words of a dictionary, see {@link #forEachWord(WordConsumer)} */
+    public interface WordConsumer {
+        void accept(String word, int frequency);
+    }
+
+    /**
+     * Calls the consumer for every word in this dictionary with its unigram frequency.
+     * Does nothing for dictionaries that can't list their words. May take long for large dictionaries.
+     */
+    public void forEachWord(final WordConsumer consumer) { }
+
+    /**
+     * @return the probability of the word following the words in ngramContext, on the same scale as
+     * {@link #getFrequency(String)}, or {@link #NOT_A_PROBABILITY} if this dictionary has no such n-gram
+     */
+    public int getNgramProbability(final NgramContext ngramContext, final String word) {
+        return NOT_A_PROBABILITY;
+    }
+
     /**
      * Not a true dictionary. A placeholder used to indicate suggestions that don't come from any
      * real dictionary.

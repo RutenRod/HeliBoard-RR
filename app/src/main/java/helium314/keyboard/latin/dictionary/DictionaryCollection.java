@@ -71,6 +71,24 @@ public final class DictionaryCollection extends Dictionary {
     }
 
     @Override
+    public void forEachWord(final WordConsumer consumer) {
+        for (final Dictionary dictionary : mDictionaries) {
+            // emoji dictionaries contain keywords for finding emojis, not words to write
+            if (TYPE_EMOJI.equals(dictionary.mDictType)) continue;
+            dictionary.forEachWord(consumer);
+        }
+    }
+
+    @Override
+    public int getNgramProbability(final NgramContext ngramContext, final String word) {
+        int maxProbability = NOT_A_PROBABILITY;
+        for (final Dictionary dictionary : mDictionaries) {
+            maxProbability = Math.max(maxProbability, dictionary.getNgramProbability(ngramContext, word));
+        }
+        return maxProbability;
+    }
+
+    @Override
     public int getFrequency(final String word) {
         int maxFreq = -1;
         for (int i = mDictionaries.size() - 1; i >= 0; --i) {
