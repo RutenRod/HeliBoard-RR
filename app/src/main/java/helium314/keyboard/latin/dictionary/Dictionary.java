@@ -190,7 +190,8 @@ public abstract class Dictionary {
     }
 
     /**
-     * Calls the consumer for every word in this dictionary with its unigram frequency.
+     * Calls the consumer for every word in this dictionary with its unigram frequency,
+     * which is {@link #NOT_A_PROBABILITY} for words that are in the dictionary but currently not suggested.
      * Does nothing for dictionaries that can't list their words. May take long for large dictionaries.
      */
     public void forEachWord(final WordConsumer consumer) { }

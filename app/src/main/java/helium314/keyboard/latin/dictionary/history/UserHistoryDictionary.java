@@ -53,6 +53,9 @@ public class UserHistoryDictionary extends ExpandableBinaryDictionary {
         if (word.length() > BinaryDictionary.DICTIONARY_MAX_WORD_LENGTH) {
             return;
         }
+        if (!LearnedWords.onBeforeLearning(userHistoryDictionary, ngramContext, word, timestamp)) {
+            return;
+        }
         userHistoryDictionary.updateEntriesForWord(ngramContext, word,
                 isValid, 1 /* count */, timestamp);
     }

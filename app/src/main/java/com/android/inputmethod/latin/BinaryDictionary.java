@@ -423,7 +423,6 @@ public final class BinaryDictionary extends Dictionary {
             if (length == 0) continue;
             final int[] wordCodePoints = java.util.Arrays.copyOf(codePoints, length);
             final int probability = getProbabilityNative(mNativeDict, wordCodePoints);
-            if (probability == NOT_A_PROBABILITY) continue;
             consumer.accept(new String(wordCodePoints, 0, length), probability);
         } while (token != 0);
     }
@@ -479,6 +478,23 @@ public final class BinaryDictionary extends Dictionary {
         }
         final int[] codePoints = StringUtils.toCodePointArray(word);
         if (!removeUnigramEntryNative(mNativeDict, codePoints)) {
+            return false;
+        }
+        mHasUpdated = true;
+        return true;
+    }
+
+    // Remove an n-gram entry from the binary dictionary in native code.
+    public boolean removeNgramEntry(final NgramContext ngramContext, final String word) {
+        if (!ngramContext.isValid() || TextUtils.isEmpty(word)) {
+            return false;
+        }
+        final int[][] prevWordCodePointArrays = new int[ngramContext.getPrevWordCount()][];
+        final boolean[] isBeginningOfSentenceArray = new boolean[ngramContext.getPrevWordCount()];
+        ngramContext.outputToArray(prevWordCodePointArrays, isBeginningOfSentenceArray);
+        final int[] wordCodePoints = StringUtils.toCodePointArray(word);
+        if (!removeNgramEntryNative(mNativeDict, prevWordCodePointArrays,
+                isBeginningOfSentenceArray, wordCodePoints)) {
             return false;
         }
         mHasUpdated = true;

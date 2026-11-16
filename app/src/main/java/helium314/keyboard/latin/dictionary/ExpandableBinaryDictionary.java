@@ -174,6 +174,26 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
     }
 
     @Override
+    public WordProperty getWordProperty(final String word, final boolean isBeginningOfSentence) {
+        reloadDictionaryIfRequired();
+        boolean lockAcquired = false;
+        try {
+            lockAcquired = mLock.readLock().tryLock(
+                    TIMEOUT_FOR_READ_OPS_IN_MILLISECONDS, TimeUnit.MILLISECONDS);
+            if (lockAcquired && mBinaryDictionary != null && mBinaryDictionary.isInDictionary(word)) {
+                return mBinaryDictionary.getWordProperty(word, isBeginningOfSentence);
+            }
+        } catch (final InterruptedException e) {
+            Log.e(TAG, "Interrupted tryLock() in getWordProperty().", e);
+        } finally {
+            if (lockAcquired) {
+                mLock.readLock().unlock();
+            }
+        }
+        return null;
+    }
+
+    @Override
     public void forEachWord(final WordConsumer consumer) {
         reloadDictionaryIfRequired();
         boolean lockAcquired = false;
@@ -327,6 +347,25 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
             if (!binaryDictionary.removeUnigramEntry(word)) {
                 if (DEBUG) {
                     Log.i(TAG, "Cannot remove unigram entry: " + word);
+                }
+            }
+        });
+    }
+
+    /**
+     * Dynamically remove the n-gram entry in the binary dictionary.
+     */
+    public void removeNgramEntryDynamically(@NonNull final NgramContext ngramContext, final String word) {
+        reloadDictionaryIfRequired();
+        asyncExecuteTaskWithWriteLock(() -> {
+            final BinaryDictionary binaryDictionary = getBinaryDictionary();
+            if (binaryDictionary == null) {
+                return;
+            }
+            runGCIfRequiredLocked(true /* mindsBlockByGC */);
+            if (!binaryDictionary.removeNgramEntry(ngramContext, word)) {
+                if (DEBUG) {
+                    Log.i(TAG, "Cannot remove n-gram entry for: " + word);
                 }
             }
         });

@@ -1326,4 +1326,31 @@ New dictionary:
     <string name="gesture_data_swipe_o_scope">Tool for visualizing gesture data: &lt;a href=%s&gt;Swipe-O-Scope&lt;/a&gt;</string>
 
     <!-- new strings should go above the section for gesture data gathering -->
+    <!-- Learned words screen: what the keyboard learned from typing -->
+    <string name="learned_words">Learned words</string>
+    <string name="learned_words_summary">See, remove and block what the keyboard learned from your typing</string>
+    <string name="learned_words_subtitle">%1$s · %2$d words</string>
+    <string name="learned_words_strength_new">new</string>
+    <string name="learned_words_sort_alphabetically">Sort alphabetically</string>
+    <string name="learned_words_sort_by_strength">Sort by strength</string>
+    <string name="learned_words_change_language">Language</string>
+    <string name="learned_words_blocked">Blocked words</string>
+    <string name="learned_words_blocked_hint">Blocked words are never suggested and never learned. Tap a word to unblock it.</string>
+    <string name="learned_words_blocked_empty">No blocked words. You can block a word from the list of learned words.</string>
+    <string name="learned_words_block">Block</string>
+    <string name="learned_words_forget_recent">Forget the last 5 minutes</string>
+    <string name="learned_words_forget_recent_message">Words and word sequences the keyboard first saw in the last 5 minutes will be removed, in all languages. Words it knew before stay.</string>
+    <string name="learned_words_forgot_recent">Forgot %d new words and word sequences</string>
+    <string name="learned_words_export">Export to file</string>
+    <string name="learned_words_import">Import from file</string>
+    <string name="learned_words_exported">Exported %d words</string>
+    <string name="learned_words_imported">Imported %d words</string>
+    <string name="learned_words_file_error">Could not read or write the file</string>
+    <string name="learned_words_remove_all">Remove all learned words</string>
+    <string name="learned_words_remove_all_message">Everything the keyboard learned for %s will be removed. This can\'t be undone.</string>
+    <string name="learned_words_details_strength">Strength: %d of 255. Stronger words are suggested earlier.</string>
+    <string name="learned_words_details_new">Seen too rarely to be suggested yet.</string>
+    <string name="learned_words_details_last_used">Last used: %s</string>
+    <string name="learned_words_details_next_words">You often write after it: %s</string>
+    <string name="learned_words_details_hint">Delete makes the keyboard forget the word until you use it again. Block also keeps it from being suggested or learned again.</string>
 </resources>
