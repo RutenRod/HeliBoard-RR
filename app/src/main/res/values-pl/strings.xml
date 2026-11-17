@@ -585,4 +585,5 @@
     <string name="learned_words_details_hint">Usuń sprawia, że klawiatura zapomina słowo, dopóki nie użyjesz go ponownie. Zablokuj dodatkowo sprawia, że nie będzie już podpowiadane ani zapamiętywane.</string>
     <string name="prefs_keyboard_width_scale">Skala szerokości klawiatury</string>
     <string name="prefs_keyboard_horizontal_position">Położenie klawiatury (0% z lewej, 100% z prawej)</string>
+    <string name="delete_slider_delay">Suwak usuwania: czas przytrzymania</string>
 </resources>

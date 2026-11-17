@@ -89,6 +89,7 @@ public class SettingsValues {
     public final boolean mTouchpadEdgeScroll;
     public final int mDeleteSwipe;
     public final boolean mDeleteSlider;
+    public final int mDeleteSliderDelay;
     public final boolean mAutospaceAfterPunctuation;
     public final boolean mAutospaceAfterSuggestion;
     public final boolean mAutospaceAfterGestureTyping;
@@ -284,6 +285,7 @@ public class SettingsValues {
         mTouchpadEdgeScroll = prefs.getBoolean(Settings.PREF_TOUCHPAD_EDGE_SCROLL, Defaults.PREF_TOUCHPAD_EDGE_SCROLL);
         mDeleteSwipe = prefs.getInt(Settings.PREF_DELETE_SWIPE, Defaults.PREF_DELETE_SWIPE);
         mDeleteSlider = prefs.getBoolean(Settings.PREF_DELETE_SLIDER, Defaults.PREF_DELETE_SLIDER);
+        mDeleteSliderDelay = prefs.getInt(Settings.PREF_DELETE_SLIDER_DELAY, Defaults.PREF_DELETE_SLIDER_DELAY);
         mAutospaceAfterPunctuation = prefs.getBoolean(Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION, Defaults.PREF_AUTOSPACE_AFTER_PUNCTUATION);
         mAutospaceAfterSuggestion = prefs.getBoolean(Settings.PREF_AUTOSPACE_AFTER_SUGGESTION, Defaults.PREF_AUTOSPACE_AFTER_SUGGESTION);
         mAutospaceAfterGestureTyping = prefs.getBoolean(Settings.PREF_AUTOSPACE_AFTER_GESTURE_TYPING, Defaults.PREF_AUTOSPACE_AFTER_GESTURE_TYPING);

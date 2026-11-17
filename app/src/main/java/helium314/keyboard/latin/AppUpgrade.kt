@@ -85,6 +85,7 @@ private object AppUpgrade {
         val oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
         if (oldVersion == 0) {
             // fresh install -> no need to upgrade, as this does things like keeping old defaults which is on wanted on actual upgrade
+            SubtypeSettings.setUpRrDefaultLanguages(context)
             prefs.edit { putInt(Settings.PREF_VERSION_CODE, BuildConfig.VERSION_CODE) }
             return
         }

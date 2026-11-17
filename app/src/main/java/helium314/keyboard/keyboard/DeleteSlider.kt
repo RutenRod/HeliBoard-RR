@@ -18,27 +18,30 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- *  Delete slider: holding the delete key for [ACTIVATION_DELAY_MS] turns the key into a slider that
+ *  Delete slider: holding the delete key for the time set in the settings turns the key into a slider that
  *  spans the keys of the keyboard. The finger position controls what happens:
  *  - where the finger was when the slider appeared, and right of it: delete [START_SPEED] characters per second
  *  - moving left, the speed slowly rises to [THRESHOLD_SPEED] at the threshold, [THRESHOLD_DISTANCE] of the way to the left end
  *  - left of the threshold: delete faster, up to [MAX_DELETE_SPEED] characters per second at the left end
  *  - once the threshold was reached, the part right of it changes: the speed goes down evenly from
- *    deleting [THRESHOLD_SPEED] at the threshold to restoring [THRESHOLD_SPEED] characters per second at the
- *    right end. Text can't be restored before the threshold was reached.
+ *    deleting [THRESHOLD_SPEED] at the threshold to restoring [MAX_RESTORE_SPEED] characters per second at the
+ *    right end, with a pause zone where deleting turns into restoring. Text can't be restored before the
+ *    threshold was reached.
  *  Lifting the finger ends the slider and keeps the text as it is at that moment.
  */
 object DeleteSlider {
-    const val ACTIVATION_DELAY_MS = 650L
     private const val START_SPEED = 2f
     private const val THRESHOLD_SPEED = 3f
     private const val MAX_DELETE_SPEED = 50f
+    private const val MAX_RESTORE_SPEED = 4f
     /** part of the way from the starting point to the left end where [THRESHOLD_SPEED] is reached */
     private const val THRESHOLD_DISTANCE = 0.18f
     /** how much slower than evenly the speed rises left of the threshold, 1 would be an even rise */
     private const val SPEED_CURVE_EXPONENT = 1.8f
-    /** slower than this (characters per second) nothing happens, so there is a place to rest between deleting and restoring */
-    private const val PAUSE_SPEED = 0.4f
+    /** part of the way from the threshold to the right end where nothing happens, so there is a place to rest between deleting and restoring */
+    private const val PAUSE_ZONE_WIDTH = 0.233f
+    /** where on the way from the threshold to the right end deleting turns into restoring */
+    private const val TURN_POSITION = THRESHOLD_SPEED / (THRESHOLD_SPEED + MAX_RESTORE_SPEED)
     private const val TICK_MS = 16L
     private const val EXPAND_ANIMATION_MS = 180f
 
@@ -104,7 +107,7 @@ object DeleteSlider {
         val keys = (keyboardView as? KeyboardView)?.keyboard?.sortedKeys
         sliderLeft = (keys?.minOfOrNull { it.x } ?: 0) + keyboardView.paddingLeft.toFloat()
         sliderRight = (keys?.maxOfOrNull { it.x + it.width } ?: keyboardView.width) + keyboardView.paddingLeft.toFloat()
-        handler.postDelayed(activateRunnable, ACTIVATION_DELAY_MS)
+        handler.postDelayed(activateRunnable, Settings.getValues().mDeleteSliderDelay.toLong())
     }
 
     /** @return whether the slider is active and has consumed the move */
@@ -184,9 +187,12 @@ object DeleteSlider {
         }
         // evenly from deleting at the threshold to restoring at the right end
         val t = ((x - thresholdX) / max(rightEndX - thresholdX, 1f)).coerceIn(0f, 1f)
-        val speed = THRESHOLD_SPEED - 2f * THRESHOLD_SPEED * t
-        return if (kotlin.math.abs(speed) < PAUSE_SPEED) 0f else speed
+        if (kotlin.math.abs(t - TURN_POSITION) < PAUSE_ZONE_WIDTH / 2f) return 0f
+        return THRESHOLD_SPEED - (THRESHOLD_SPEED + MAX_RESTORE_SPEED) * t
     }
+
+    /** x position of the given part of the way from the threshold to the right end */
+    private fun afterThresholdX(t: Float) = thresholdX + (rightEndX - thresholdX) * t
 
     private fun tick() {
         val keyboardView = view
@@ -239,18 +245,25 @@ object DeleteSlider {
 
         val restoring = currentSpeed < 0
         val thumbX = fingerX.coerceIn(left + radius, right - radius)
-        // where deleting turns into restoring, only exists once the threshold was reached
-        val turnX = (thresholdX + rightEndX) / 2f
-        if (thresholdReached && turnX < right) {
+        // pause zone and restore zone, only exist once the threshold was reached
+        val turnX = afterThresholdX(TURN_POSITION)
+        val pauseStartX = afterThresholdX(TURN_POSITION - PAUSE_ZONE_WIDTH / 2f)
+        val restoreStartX = afterThresholdX(TURN_POSITION + PAUSE_ZONE_WIDTH / 2f)
+        if (thresholdReached && pauseStartX < right) {
             canvas.save()
-            canvas.clipRect(turnX, top, right, bottom)
+            canvas.clipRect(pauseStartX, top, restoreStartX, bottom)
+            paint.color = ColorUtils.blendARGB(background, textColor, if (currentSpeed == 0f) 0.3f else 0.18f)
+            canvas.drawRoundRect(rect, radius, radius, paint)
+            canvas.restore()
+            canvas.save()
+            canvas.clipRect(restoreStartX, top, right, bottom)
             paint.color = ColorUtils.blendARGB(background, textColor, if (restoring) 0.4f else 0.25f)
             canvas.drawRoundRect(rect, radius, radius, paint)
             canvas.restore()
         }
 
         // filled part shows how fast text is deleted
-        val fillRight = if (thresholdReached) turnX else anchorX
+        val fillRight = if (thresholdReached) pauseStartX else anchorX
         if (!restoring && thumbX < fillRight) {
             canvas.save()
             canvas.clipRect(thumbX, top, min(fillRight, right), bottom)
@@ -288,13 +301,9 @@ object DeleteSlider {
             }
             paint.color = textColor
             paint.textSize = (bottom - top) * 0.36f
-            paint.textAlign = Paint.Align.CENTER
-            val textWidth = paint.measureText(label)
-            // keep the label away from the finger
-            val center = (left + right) / 2f
-            val textX = if (kotlin.math.abs(thumbX - center) < textWidth / 2f + radius * 1.5f) {
-                if (thumbX > center) left + radius + textWidth / 2f else right - radius - textWidth / 2f
-            } else center
+            // always at the left end of the slider
+            paint.textAlign = Paint.Align.LEFT
+            val textX = left + radius
             val textY = (top + bottom) / 2f - (paint.descent() + paint.ascent()) / 2f
             canvas.drawText(label, textX, textY, paint)
         } else {

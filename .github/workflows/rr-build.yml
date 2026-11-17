@@ -1,6 +1,6 @@
 name: RR keyboards
 
-# Builds the Polish-only and the English-only keyboard, each is a separate app.
+# Builds the own keyboard with Polish and English.
 # To be able to install a new build over an older one (keeping settings and learned words), all builds
 # need to be signed with the same key: add a repository secret RR_KEYSTORE_BASE64 containing a
 # base64-encoded debug keystore. Without the secret every build gets a new key and the old app
@@ -14,11 +14,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ pl, en ]
-
     steps:
       - uses: actions/checkout@v4
 
@@ -43,20 +38,20 @@ jobs:
           fi
 
       - name: Prepare variant
-        run: rr/apply-variant.sh ${{ matrix.language }}
+        run: rr/apply-variant.sh pl,en
 
       - name: Build with Gradle
-        run: chmod +x gradlew && ./gradlew assembleDebug -PrrLanguage=${{ matrix.language }}
+        run: chmod +x gradlew && ./gradlew assembleDebug -PrrLanguages=pl,en
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Klawiatura-${{ matrix.language }}
+          name: Klawiatura
           path: app/build/outputs/apk/debug/*-debug*.apk
 
       - name: Archive reports for failed job
         uses: actions/upload-artifact@v4
         with:
-          name: reports-${{ matrix.language }}
+          name: reports
           path: '*/build/reports'
         if: ${{ failure() }}

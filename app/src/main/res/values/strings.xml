@@ -1357,4 +1357,6 @@ New dictionary:
     <string name="prefs_keyboard_width_scale">Keyboard width scale</string>
     <!-- Title of the setting for where a keyboard with reduced width is placed, 0% is left and 100% is right -->
     <string name="prefs_keyboard_horizontal_position">Keyboard position (0% left, 100% right)</string>
+    <!-- Title of the setting for how long the delete key must be held before it turns into a slider -->
+    <string name="delete_slider_delay">Delete slider: hold time</string>
 </resources>

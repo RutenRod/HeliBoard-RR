@@ -72,6 +72,7 @@ fun AdvancedSettingsScreen(
             Settings.PREF_TOUCHPAD_EDGE_SCROLL else null,
         Settings.PREF_DELETE_SWIPE,
         Settings.PREF_DELETE_SLIDER,
+        if (prefs.getBoolean(Settings.PREF_DELETE_SLIDER, Defaults.PREF_DELETE_SLIDER)) Settings.PREF_DELETE_SLIDER_DELAY else null,
         Settings.PREF_SPACE_TO_CHANGE_LANG,
         Settings.PREFS_LONG_PRESS_SYMBOLS_FOR_NUMPAD,
         Settings.PREF_ENABLE_EMOJI_ALT_PHYSICAL_KEY,
@@ -168,6 +169,15 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_DELETE_SLIDER, R.string.delete_slider, R.string.delete_slider_summary) {
         SwitchPreference(it, Defaults.PREF_DELETE_SLIDER)
+    },
+    Setting(context, Settings.PREF_DELETE_SLIDER_DELAY, R.string.delete_slider_delay) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_DELETE_SLIDER_DELAY,
+            range = 100f..1000f,
+            description = { stringResource(R.string.abbreviation_unit_milliseconds, it.toString()) }
+        )
     },
     Setting(context, Settings.PREF_SPACE_TO_CHANGE_LANG,
         R.string.prefs_long_press_keyboard_to_change_lang,

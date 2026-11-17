@@ -15,6 +15,7 @@ import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.BuildConfig
 import helium314.keyboard.latin.RichInputMethodManager
 import helium314.keyboard.latin.common.Constants.Separators
+import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.common.LocaleUtils
 import helium314.keyboard.latin.define.DebugFlags
 import helium314.keyboard.latin.settings.Defaults
@@ -236,8 +237,8 @@ object SubtypeSettings {
 
     private fun loadResourceSubtypes(resources: Resources) {
         getResourceSubtypes(resources).forEach {
-            // single-language variants only offer their language
-            if (BuildConfig.RR_LANGUAGE.isNotEmpty() && it.locale().language != BuildConfig.RR_LANGUAGE) return@forEach
+            // own variants only offer their languages
+            if (RR_LANGUAGES.isNotEmpty() && it.locale().language !in RR_LANGUAGES) return@forEach
             resourceSubtypesByLocale.getOrPut(it.locale()) { ArrayList(2) }.add(it)
         }
     }
@@ -310,4 +311,28 @@ object SubtypeSettings {
     private val systemLocales = mutableListOf<Locale>()
     private val systemSubtypes = mutableListOf<InputMethodSubtype>()
     private val TAG = SubtypeSettings::class.simpleName
+    private val RR_LANGUAGES = BuildConfig.RR_LANGUAGES.split(",").filter { it.isNotEmpty() }
+
+    /**
+     *  First start of the own variant with Polish and English: enable both languages, each with the other
+     *  as additional language for multilingual typing, so words of both languages are suggested.
+     */
+    fun setUpRrDefaultLanguages(context: Context) {
+        if ("pl" !in RR_LANGUAGES || "en" !in RR_LANGUAGES) return
+        val prefs = context.prefs()
+        if (prefs.contains(Settings.PREF_ENABLED_SUBTYPES)) return
+        val polish = resourceSubtypesByLocale[Locale.forLanguageTag("pl")]?.firstOrNull()?.toSettingsSubtype() ?: return
+        val english = resourceSubtypesByLocale[Locale.US]?.firstOrNull()?.toSettingsSubtype() ?: return
+        val polishMultilingual = polish.with(ExtraValue.SECONDARY_LOCALES, Locale.US.toLanguageTag())
+        val englishMultilingual = english.with(ExtraValue.SECONDARY_LOCALES, polish.locale.toLanguageTag())
+        val subtypes = listOf(polishMultilingual, englishMultilingual)
+        prefs.edit {
+            putString(Settings.PREF_ADDITIONAL_SUBTYPES, createPrefSubtypes(subtypes))
+            putString(Settings.PREF_ENABLED_SUBTYPES, createPrefSubtypes(subtypes))
+            putString(Settings.PREF_SELECTED_SUBTYPE, polishMultilingual.toPref())
+        }
+        loadAdditionalSubtypes(prefs)
+        enabledSubtypes.clear()
+        loadEnabledSubtypes(context)
+    }
 }

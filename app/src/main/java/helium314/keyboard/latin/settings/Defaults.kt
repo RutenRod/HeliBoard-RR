@@ -110,9 +110,10 @@ object Defaults {
     @JvmField
     val PREF_SPACE_HORIZONTAL_SWIPE = KeyboardActionListener.SwipeAction.MOVE_CURSOR.name
     @JvmField
-    val PREF_SPACE_VERTICAL_SWIPE = KeyboardActionListener.SwipeAction.NONE.name
+    val PREF_SPACE_VERTICAL_SWIPE = KeyboardActionListener.SwipeAction.SWITCH_LANGUAGE.name
     const val PREF_DELETE_SWIPE = 1
     const val PREF_DELETE_SLIDER = true
+    const val PREF_DELETE_SLIDER_DELAY = 300
     const val PREF_AUTOSPACE_AFTER_PUNCTUATION = false
     const val PREF_AUTOSPACE_AFTER_SUGGESTION = true
     const val PREF_AUTOSPACE_AFTER_GESTURE_TYPING = true
@@ -161,7 +162,7 @@ object Defaults {
     const val PREF_SHOW_POPUP_HINTS = false
     const val PREF_SHOW_TLD_POPUP_KEYS = true
     const val PREF_MORE_POPUP_KEYS = "main"
-    const val PREF_SPACE_TO_CHANGE_LANG = true
+    const val PREF_SPACE_TO_CHANGE_LANG = false
     const val PREF_LANGUAGE_SWIPE_DISTANCE = 5
     const val PREF_TOUCHPAD_SENSITIVITY = 50
     const val PREF_TOUCHPAD_EDGE_SCROLL = true
