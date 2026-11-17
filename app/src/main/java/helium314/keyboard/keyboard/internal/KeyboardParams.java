@@ -232,6 +232,16 @@ public class KeyboardParams {
                     R.styleable.Keyboard_keyboardRightPadding, width, width, 0)
                     * sv.mSidePaddingScale);
 
+            // user-defined reduced keyboard width, only for the main keyboards (which don't use attributes from xml)
+            // one-handed mode and floating keyboard have their own width
+            if (attr == null && sv.mKeyboardWidthScale < 1f && !sv.mOneHandedModeEnabled && !sv.mIsFloatingKeyboard) {
+                final int unused = (int) ((width - mLeftPadding - mRightPadding)
+                        * (1f - Math.max(sv.mKeyboardWidthScale, 0.3f)));
+                final int unusedLeft = (int) (unused * Math.min(Math.max(sv.mKeyboardHorizontalPosition, 0f), 1f));
+                mLeftPadding += unusedLeft;
+                mRightPadding += unused - unusedLeft;
+            }
+
             mBaseWidth = mOccupiedWidth - mLeftPadding - mRightPadding;
             final float defaultKeyWidthFactor = context.getResources().getInteger(R.integer.config_screen_metrics) > 2 ? 0.9f : 1f;
             final float alphaSymbolKeyWidth = keyAttr.getFraction(R.styleable.Keyboard_Key_keyWidth,

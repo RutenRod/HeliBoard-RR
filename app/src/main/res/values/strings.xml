@@ -233,7 +233,7 @@
     <!-- Preferences item for the delete slider -->
     <string name="delete_slider">Delete slider</string>
     <!-- Description for "delete_slider" option. -->
-    <string name="delete_slider_summary">Hold the delete key for a second to turn it into a slider: slide left to delete faster, slide right to bring deleted text back</string>
+    <string name="delete_slider_summary">Hold the delete key to turn it into a slider: slide left to delete faster. After speeding up, slide back right to slow down and then bring deleted text back</string>
     <!-- Preferences item and dialog title for backup and restore -->
     <string name="backup_restore_title">Backup and restore</string>
     <!-- Message for backup and restore dialog -->
@@ -1353,4 +1353,8 @@ New dictionary:
     <string name="learned_words_details_last_used">Last used: %s</string>
     <string name="learned_words_details_next_words">You often write after it: %s</string>
     <string name="learned_words_details_hint">Delete makes the keyboard forget the word until you use it again. Block also keeps it from being suggested or learned again.</string>
+    <!-- Title of the setting for reducing the width of the keyboard, the value is a percentage -->
+    <string name="prefs_keyboard_width_scale">Keyboard width scale</string>
+    <!-- Title of the setting for where a keyboard with reduced width is placed, 0% is left and 100% is right -->
+    <string name="prefs_keyboard_horizontal_position">Keyboard position (0% left, 100% right)</string>
 </resources>

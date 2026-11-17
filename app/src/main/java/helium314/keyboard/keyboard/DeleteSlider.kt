@@ -11,6 +11,7 @@ import android.view.View
 import androidx.core.graphics.ColorUtils
 import helium314.keyboard.latin.common.ColorType
 import helium314.keyboard.latin.settings.Settings
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -18,18 +19,26 @@ import kotlin.math.roundToInt
 
 /**
  *  Delete slider: holding the delete key for [ACTIVATION_DELAY_MS] turns the key into a slider that
- *  spans the keyboard width. The finger position controls what happens:
- *  - where the finger was when the slider appeared: delete [MIN_DELETE_SPEED] characters per second
- *  - further left: delete faster, up to [MAX_DELETE_SPEED] characters per second at the left edge
- *  - right of the starting point: put the deleted text back, at up to [MAX_RESTORE_SPEED] characters per second
+ *  spans the keys of the keyboard. The finger position controls what happens:
+ *  - where the finger was when the slider appeared, and right of it: delete [START_SPEED] characters per second
+ *  - moving left, the speed slowly rises to [THRESHOLD_SPEED] at the threshold, [THRESHOLD_DISTANCE] of the way to the left end
+ *  - left of the threshold: delete faster, up to [MAX_DELETE_SPEED] characters per second at the left end
+ *  - once the threshold was reached, the part right of it changes: the speed goes down evenly from
+ *    deleting [THRESHOLD_SPEED] at the threshold to restoring [THRESHOLD_SPEED] characters per second at the
+ *    right end. Text can't be restored before the threshold was reached.
  *  Lifting the finger ends the slider and keeps the text as it is at that moment.
  */
 object DeleteSlider {
-    const val ACTIVATION_DELAY_MS = 1000L
-    private const val MIN_DELETE_SPEED = 3f
+    const val ACTIVATION_DELAY_MS = 650L
+    private const val START_SPEED = 2f
+    private const val THRESHOLD_SPEED = 3f
     private const val MAX_DELETE_SPEED = 50f
-    private const val MIN_RESTORE_SPEED = 1f
-    private const val MAX_RESTORE_SPEED = 5f
+    /** part of the way from the starting point to the left end where [THRESHOLD_SPEED] is reached */
+    private const val THRESHOLD_DISTANCE = 0.18f
+    /** how much slower than evenly the speed rises left of the threshold, 1 would be an even rise */
+    private const val SPEED_CURVE_EXPONENT = 1.8f
+    /** slower than this (characters per second) nothing happens, so there is a place to rest between deleting and restoring */
+    private const val PAUSE_SPEED = 0.4f
     private const val TICK_MS = 16L
     private const val EXPAND_ANIMATION_MS = 180f
 
@@ -44,8 +53,13 @@ object DeleteSlider {
     private var keyTop = 0f
     private var keyRight = 0f
     private var keyBottom = 0f
+    private var sliderLeft = 0f // the slider spans the keys of the keyboard
+    private var sliderRight = 0f
     private var anchorX = 0f // finger position when the slider appeared: slowest deletion
-    private var restoreStartX = 0f // right of this the deleted text is put back
+    private var thresholdX = 0f // THRESHOLD_SPEED is reached here
+    private var leftEndX = 0f // fastest deletion
+    private var rightEndX = 0f // fastest restoring
+    private var thresholdReached = false
     private var fingerX = 0f
 
     private var activationTime = 0L
@@ -86,6 +100,10 @@ object DeleteSlider {
         keyTop = (key.y + keyboardView.paddingTop).toFloat()
         keyRight = keyLeft + key.width
         keyBottom = keyTop + key.height
+        // the keys may not use the whole width of the view when the keyboard width is reduced
+        val keys = (keyboardView as? KeyboardView)?.keyboard?.sortedKeys
+        sliderLeft = (keys?.minOfOrNull { it.x } ?: 0) + keyboardView.paddingLeft.toFloat()
+        sliderRight = (keys?.maxOfOrNull { it.x + it.width } ?: keyboardView.width) + keyboardView.paddingLeft.toFloat()
         handler.postDelayed(activateRunnable, ACTIVATION_DELAY_MS)
     }
 
@@ -133,19 +151,19 @@ object DeleteSlider {
             return
         }
         val density = keyboardView.resources.displayMetrics.density
-        val width = keyboardView.width.toFloat()
-        anchorX = fingerX.coerceIn(width * 0.25f, width)
-        // The delete key usually sits at the right edge, so there is little room right of the finger.
-        // Restoring starts after a small dead zone that scales with the available room.
-        val roomRight = max(width - anchorX, 0f)
-        val deadZone = (roomRight * 0.4f).coerceIn(4f * density, 12f * density)
-        restoreStartX = anchorX + deadZone
+        val width = max(sliderRight - sliderLeft, 1f)
+        val endInset = 14f * density // the finger can't comfortably reach the very ends
+        leftEndX = sliderLeft + endInset
+        rightEndX = sliderRight - endInset
+        anchorX = fingerX.coerceIn(sliderLeft + width * 0.25f, sliderRight)
+        thresholdX = anchorX - (anchorX - leftEndX) * THRESHOLD_DISTANCE
+        thresholdReached = false
         isActive = true
         activationTime = SystemClock.uptimeMillis()
         lastTickTime = activationTime
         pendingChars = 1f // delete the first character right away as feedback
         lastDirection = 1
-        currentSpeed = MIN_DELETE_SPEED
+        currentSpeed = START_SPEED
         restorableCount = listener?.onDeleteSliderStart() ?: 0
         keyboardView.invalidate()
         handler.post(tickRunnable)
@@ -153,17 +171,21 @@ object DeleteSlider {
 
     /** characters per second for the current finger position, negative when restoring */
     private fun speedAt(x: Float): Float {
-        val width = view?.width?.toFloat() ?: return 0f
-        if (x >= restoreStartX) {
-            val range = max(width - restoreStartX, 1f)
-            val t = ((x - restoreStartX) / range).coerceIn(0f, 1f)
-            return -(MIN_RESTORE_SPEED + (MAX_RESTORE_SPEED - MIN_RESTORE_SPEED) * t)
+        if (x <= thresholdX) {
+            thresholdReached = true
+            // rises slower at first, so there is fine control at low speeds
+            val t = ((thresholdX - x) / max(thresholdX - leftEndX, 1f)).coerceIn(0f, 1f)
+            return THRESHOLD_SPEED + (MAX_DELETE_SPEED - THRESHOLD_SPEED) * t.pow(SPEED_CURVE_EXPONENT)
         }
-        if (x >= anchorX) return MIN_DELETE_SPEED
-        // exponential scale: fine control near the start, top speed only close to the left edge
-        val leftEnd = width * 0.04f
-        val t = ((anchorX - x) / max(anchorX - leftEnd, 1f)).coerceIn(0f, 1f)
-        return MIN_DELETE_SPEED * (MAX_DELETE_SPEED / MIN_DELETE_SPEED).pow(t)
+        if (!thresholdReached) {
+            if (x >= anchorX) return START_SPEED
+            val t = (anchorX - x) / max(anchorX - thresholdX, 1f)
+            return START_SPEED + (THRESHOLD_SPEED - START_SPEED) * t
+        }
+        // evenly from deleting at the threshold to restoring at the right end
+        val t = ((x - thresholdX) / max(rightEndX - thresholdX, 1f)).coerceIn(0f, 1f)
+        val speed = THRESHOLD_SPEED - 2f * THRESHOLD_SPEED * t
+        return if (kotlin.math.abs(speed) < PAUSE_SPEED) 0f else speed
     }
 
     private fun tick() {
@@ -177,14 +199,14 @@ object DeleteSlider {
         val dt = min(now - lastTickTime, 100L) / 1000f
         lastTickTime = now
         currentSpeed = speedAt(fingerX)
-        val direction = if (currentSpeed < 0) -1 else 1
+        val direction = if (currentSpeed < 0) -1 else if (currentSpeed > 0) 1 else 0
         if (direction != lastDirection) {
             pendingChars = 0f
             lastDirection = direction
         }
         pendingChars += kotlin.math.abs(currentSpeed) * dt
         val count = pendingChars.toInt()
-        if (count > 0) {
+        if (count > 0 && direction != 0) {
             pendingChars -= count
             restorableCount = actionListener.onDeleteSliderStep(direction * count)
         }
@@ -197,16 +219,15 @@ object DeleteSlider {
         if (!isActive || keyboardView !== view) return
         val colors = Settings.getValues().mColors
         val density = keyboardView.resources.displayMetrics.density
-        val width = keyboardView.width.toFloat()
         val background = ColorUtils.setAlphaComponent(colors.get(ColorType.MAIN_BACKGROUND), 255)
         val textColor = colors.get(ColorType.KEY_TEXT)
         val accent = colors.get(ColorType.GESTURE_TRAIL)
 
-        // the key grows to the left until it spans the keyboard
+        // the key grows to the left until it spans the keys of the keyboard
         val progress = ((SystemClock.uptimeMillis() - activationTime) / EXPAND_ANIMATION_MS).coerceIn(0f, 1f)
         val margin = 4f * density
-        val left = keyLeft + (margin - keyLeft) * progress
-        val right = max(keyRight, width - margin)
+        val left = keyLeft + (sliderLeft + margin - keyLeft) * progress
+        val right = max(keyRight, sliderRight - margin)
         val top = keyTop + 2f * density
         val bottom = keyBottom - 2f * density
         val radius = (bottom - top) / 2f
@@ -216,21 +237,23 @@ object DeleteSlider {
         paint.color = ColorUtils.blendARGB(background, textColor, 0.12f)
         canvas.drawRoundRect(rect, radius, radius, paint)
 
-        // restore zone
         val restoring = currentSpeed < 0
-        if (restoreStartX < right) {
+        val thumbX = fingerX.coerceIn(left + radius, right - radius)
+        // where deleting turns into restoring, only exists once the threshold was reached
+        val turnX = (thresholdX + rightEndX) / 2f
+        if (thresholdReached && turnX < right) {
             canvas.save()
-            canvas.clipRect(restoreStartX, top, right, bottom)
+            canvas.clipRect(turnX, top, right, bottom)
             paint.color = ColorUtils.blendARGB(background, textColor, if (restoring) 0.4f else 0.25f)
             canvas.drawRoundRect(rect, radius, radius, paint)
             canvas.restore()
         }
 
-        // filled part between the starting point and the finger shows the deletion speed
-        val thumbX = fingerX.coerceIn(left + radius, right - radius)
-        if (!restoring && thumbX < anchorX) {
+        // filled part shows how fast text is deleted
+        val fillRight = if (thresholdReached) turnX else anchorX
+        if (!restoring && thumbX < fillRight) {
             canvas.save()
-            canvas.clipRect(thumbX, top, min(anchorX, right), bottom)
+            canvas.clipRect(thumbX, top, min(fillRight, right), bottom)
             paint.color = ColorUtils.setAlphaComponent(accent, 110)
             canvas.drawRoundRect(rect, radius, radius, paint)
             canvas.restore()
@@ -240,9 +263,13 @@ object DeleteSlider {
         paint.strokeWidth = 1.5f * density
         paint.color = ColorUtils.setAlphaComponent(textColor, 90)
         canvas.drawRoundRect(rect, radius, radius, paint)
-        // marker for the starting point
-        val anchorMarkX = anchorX.coerceIn(left + radius, right - radius)
-        canvas.drawLine(anchorMarkX, top + radius * 0.5f, anchorMarkX, bottom - radius * 0.5f, paint)
+        // markers: the threshold, and the starting point or the turning point
+        if (progress >= 1f) {
+            val markerX = (if (thresholdReached) turnX else anchorX).coerceIn(left + radius, right - radius)
+            canvas.drawLine(markerX, top + radius * 0.5f, markerX, bottom - radius * 0.5f, paint)
+            if (thresholdX > left + radius)
+                canvas.drawLine(thresholdX, top + radius * 0.75f, thresholdX, bottom - radius * 0.75f, paint)
+        }
 
         // thumb
         paint.style = Paint.Style.FILL
@@ -251,8 +278,14 @@ object DeleteSlider {
 
         // label: speed, and how much can still be restored
         if (progress >= 1f) {
-            val speed = kotlin.math.abs(currentSpeed).roundToInt()
-            val label = if (restoring) "↶ $speed/s  ($restorableCount)" else "⌫ $speed/s"
+            val absoluteSpeed = kotlin.math.abs(currentSpeed)
+            val speed = if (absoluteSpeed < 9.95f) String.format(Locale.getDefault(), "%.1f", absoluteSpeed)
+                else absoluteSpeed.roundToInt().toString()
+            val label = when {
+                restoring -> "\u21B6 $speed/s  ($restorableCount)"
+                currentSpeed == 0f -> "\u2016  ($restorableCount)"
+                else -> "\u232B $speed/s"
+            }
             paint.color = textColor
             paint.textSize = (bottom - top) * 0.36f
             paint.textAlign = Paint.Align.CENTER

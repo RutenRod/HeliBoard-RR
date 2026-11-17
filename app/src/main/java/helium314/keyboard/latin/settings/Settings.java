@@ -105,6 +105,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_BOTTOM_ROW_SCALE_PREFIX = "bottom_row_scale";
     public static final String PREF_BOTTOM_PADDING_SCALE_PREFIX = "bottom_padding_scale";
     public static final String PREF_SIDE_PADDING_SCALE_PREFIX = "side_padding_scale";
+    public static final String PREF_KEYBOARD_WIDTH_SCALE_PREFIX = "keyboard_width_scale";
+    public static final String PREF_KEYBOARD_HORIZONTAL_POSITION_PREFIX = "keyboard_horizontal_position";
     public static final String PREF_KEY_GAP_SCALE_PREFIX = "key_gap_scale";
     public static final String PREF_FLOATING_HEIGHT_PREFIX = "floating_height";
     public static final String PREF_FLOATING_WIDTH_PREFIX = "floating_width";
@@ -463,6 +465,20 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         final Float[] defaults = Defaults.PREF_SIDE_PADDING_SCALE;
         final float defaultValue = defaults[index];
         return prefs.getFloat(SettingsKt.createPrefKeyForBooleanSettings(PREF_SIDE_PADDING_SCALE_PREFIX, index, 3), defaultValue);
+    }
+
+    /** part of the available width used for the keys, the rest is empty space at the sides */
+    public static float readWidthScale(SharedPreferences prefs, boolean landscape) {
+        int index = SettingsKt.findIndexOfDefaultSetting(landscape);
+        final float defaultValue = Defaults.PREF_KEYBOARD_WIDTH_SCALE[index];
+        return prefs.getFloat(SettingsKt.createPrefKeyForBooleanSettings(PREF_KEYBOARD_WIDTH_SCALE_PREFIX, index, 1), defaultValue);
+    }
+
+    /** where a keyboard with reduced width is placed, 0 is at the left edge and 1 at the right edge */
+    public static float readHorizontalPosition(SharedPreferences prefs, boolean landscape) {
+        int index = SettingsKt.findIndexOfDefaultSetting(landscape);
+        final float defaultValue = Defaults.PREF_KEYBOARD_HORIZONTAL_POSITION[index];
+        return prefs.getFloat(SettingsKt.createPrefKeyForBooleanSettings(PREF_KEYBOARD_HORIZONTAL_POSITION_PREFIX, index, 1), defaultValue);
     }
 
     public static float readHeightScale(SharedPreferences prefs, boolean landscape, boolean folded) {

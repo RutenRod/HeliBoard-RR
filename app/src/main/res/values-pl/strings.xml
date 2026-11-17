@@ -556,7 +556,7 @@
     <string name="layout_dpad" tools:keep="@string/layout_dpad">D-pad</string>
     <string name="space_swipe_toggle_dpad_entry">Przełącz na D-pad</string>
     <string name="delete_slider">Suwak usuwania</string>
-    <string name="delete_slider_summary">Przytrzymaj klawisz usuwania przez sekundę, aby zamienić go w suwak: przesuń w lewo, aby usuwać szybciej, w prawo, aby przywrócić usunięty tekst</string>
+    <string name="delete_slider_summary">Przytrzymaj klawisz usuwania, aby zamienić go w suwak: przesuń w lewo, aby usuwać szybciej. Po przyspieszeniu przesuń z powrotem w prawo, aby zwolnić, a potem przywracać usunięty tekst</string>
     <string name="learned_words">Nauczone słowa</string>
     <string name="learned_words_summary">Przeglądaj, usuwaj i blokuj to, czego klawiatura nauczyła się z Twojego pisania</string>
     <string name="learned_words_subtitle">%1$s · słów: %2$d</string>
@@ -583,4 +583,6 @@
     <string name="learned_words_details_last_used">Ostatnio użyte: %s</string>
     <string name="learned_words_details_next_words">Często piszesz po nim: %s</string>
     <string name="learned_words_details_hint">Usuń sprawia, że klawiatura zapomina słowo, dopóki nie użyjesz go ponownie. Zablokuj dodatkowo sprawia, że nie będzie już podpowiadane ani zapamiętywane.</string>
+    <string name="prefs_keyboard_width_scale">Skala szerokości klawiatury</string>
+    <string name="prefs_keyboard_horizontal_position">Położenie klawiatury (0% z lewej, 100% z prawej)</string>
 </resources>

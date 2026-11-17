@@ -6,6 +6,11 @@ plugins {
     kotlin("plugin.compose") version "2.4.0"
 }
 
+// Single-language variant of the keyboard, e.g. -PrrLanguage=pl. Only subtypes of this language are available,
+// and the app gets its own id, so variants for different languages can be installed next to each other.
+// App name, provider authorities and bundled dictionaries are set by rr/apply-variant.sh
+val rrLanguage: String = (project.findProperty("rrLanguage") as String?).orEmpty().trim()
+
 android {
     compileSdk = 37
 
@@ -20,6 +25,9 @@ android {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
         }
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        buildConfigField("String", "RR_LANGUAGE", "\"$rrLanguage\"")
+        if (rrLanguage.isNotEmpty())
+            applicationIdSuffix = ".$rrLanguage"
     }
 
     buildTypes {
@@ -66,7 +74,8 @@ android {
             }
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    output.outputFileName = "HeliBoard_${defaultConfig.versionName}-${variant.buildType}.apk"
+                    val language = if (rrLanguage.isEmpty()) "" else "-" + rrLanguage.uppercase()
+                    output.outputFileName = "HeliBoard${language}_${defaultConfig.versionName}-${variant.buildType}.apk"
                 }
             }
         }

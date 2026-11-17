@@ -96,6 +96,8 @@ object Defaults {
     val PREF_BOTTOM_PADDING_SCALE = arrayOf(DEFAULT_SIZE_SCALE, 0f, DEFAULT_SIZE_SCALE, 0f)
     @JvmField
     val PREF_SIDE_PADDING_SCALE = Array(8) { 0f }
+    val PREF_KEYBOARD_WIDTH_SCALE = Array(2) { 1f }
+    val PREF_KEYBOARD_HORIZONTAL_POSITION = Array(2) { 1f }
     @JvmField
     val PREF_KEY_GAP_SCALE = Array(4) { DEFAULT_SIZE_SCALE }
     const val PREF_FONT_SCALE = DEFAULT_SIZE_SCALE

@@ -12,6 +12,7 @@ import androidx.core.app.LocaleManagerCompat
 import androidx.core.content.edit
 import helium314.keyboard.compat.locale
 import helium314.keyboard.keyboard.KeyboardSwitcher
+import helium314.keyboard.latin.BuildConfig
 import helium314.keyboard.latin.RichInputMethodManager
 import helium314.keyboard.latin.common.Constants.Separators
 import helium314.keyboard.latin.common.LocaleUtils
@@ -225,8 +226,8 @@ object SubtypeSettings {
             subtypesOfLocale?.firstOrNull()
         }
         if (subtypes.isEmpty()) {
-            // hardcoded fallback to en-US for weird cases
-            systemSubtypes.add(resourceSubtypesByLocale[Locale.US]!!.first())
+            // hardcoded fallback to en-US for weird cases, or the first language in single-language variants
+            systemSubtypes.add((resourceSubtypesByLocale[Locale.US] ?: resourceSubtypesByLocale.values.first()).first())
         } else {
             systemSubtypes.addAll(subtypes)
         }
@@ -235,6 +236,8 @@ object SubtypeSettings {
 
     private fun loadResourceSubtypes(resources: Resources) {
         getResourceSubtypes(resources).forEach {
+            // single-language variants only offer their language
+            if (BuildConfig.RR_LANGUAGE.isNotEmpty() && it.locale().language != BuildConfig.RR_LANGUAGE) return@forEach
             resourceSubtypesByLocale.getOrPut(it.locale()) { ArrayList(2) }.add(it)
         }
     }
