@@ -1,6 +1,6 @@
 name: RR keyboards
 
-# Builds the own keyboard with Polish and English.
+# Builds RØR, the own keyboard with Polish and English.
 # To be able to install a new build over an older one (keeping settings and learned words), all builds
 # need to be signed with the same key: add a repository secret RR_KEYSTORE_BASE64 containing a
 # base64-encoded debug keystore. Without the secret every build gets a new key and the old app
@@ -46,7 +46,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Klawiatura
+          name: ROR
           path: app/build/outputs/apk/debug/*-debug*.apk
 
       - name: Archive reports for failed job

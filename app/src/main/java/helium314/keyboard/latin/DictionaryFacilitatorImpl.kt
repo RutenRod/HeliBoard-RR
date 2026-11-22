@@ -422,6 +422,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             }
 
             UserHistoryDictionary.addToDictionary(userHistoryDictionary, ngramContext, wordToUse, isValid, timeStampInSeconds)
+            dictionaryGroup.swipeTyping.markDynamicWordsChanged()
         }
         // we use the original word, because that's the one that is "unlearned" when the user corrects the word
         synchronized(wordsWaitingForHistory) { wordsWaitingForHistory[word] = addJob }
@@ -547,8 +548,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         val useContext = ngramContext.isValid
         for (dictGroup in dictionaryGroups) {
             if (dictGroup.swipeTyping.needsDynamicWordsRefresh()) {
+                // swipe suggestions are not created on the main thread, and words just learned should be found right away
                 val dynamicDicts = DictionaryFacilitator.DYNAMIC_DICTIONARY_TYPES.mapNotNull { dictGroup.getSubDict(it) }
-                scope.launch { dictGroup.swipeTyping.refreshDynamicWords(dynamicDicts) }
+                dictGroup.swipeTyping.refreshDynamicWords(dynamicDicts)
             }
             val candidates = dictGroup.swipeTyping.decode(keyboard, pointers.xCoordinates, pointers.yCoordinates, pointers.pointerSize)
             if (candidates.isEmpty()) continue
@@ -569,7 +571,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                 val learnedStrength = try { historyDict?.getFrequency(word) } catch (_: Exception) { null }
                     ?: Dictionary.NOT_A_PROBABILITY
                 if (learnedStrength > 0)
-                    score += SWIPE_LEARNED_WORD_BONUS + SWIPE_LEARNED_STRENGTH_BONUS * learnedStrength / 255f
+                    score += SWIPE_LEARNED_WORD_BONUS + SWIPE_LEARNED_STRENGTH_BONUS * minOf(learnedStrength, SwipeTyping.MAX_LEARNED_STRENGTH) / SwipeTyping.MAX_LEARNED_STRENGTH.toFloat()
                 if (useContext) {
                     // a word that often follows the previous words is more likely than its general frequency says
                     val learned = historyDict?.getNgramProbability(ngramContext, word) ?: Dictionary.NOT_A_PROBABILITY

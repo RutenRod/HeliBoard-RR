@@ -27,12 +27,15 @@ import kotlin.math.roundToInt
  *    deleting [THRESHOLD_SPEED] at the threshold to restoring [MAX_RESTORE_SPEED] characters per second at the
  *    right end, with a pause zone where deleting turns into restoring. Text can't be restored before the
  *    threshold was reached.
+ *  - once [FAST_SPEED] was reached, the deleting part right of the threshold is only a short [THRESHOLD_SPEED]
+ *    and a short [START_SPEED] part, the rest is added to the pause zone. Restoring stays the same.
  *  Lifting the finger ends the slider and keeps the text as it is at that moment.
  */
 object DeleteSlider {
     private const val START_SPEED = 2f
     private const val THRESHOLD_SPEED = 3f
     private const val MAX_DELETE_SPEED = 50f
+    private const val FAST_SPEED = 4f
     private const val MAX_RESTORE_SPEED = 4f
     /** part of the way from the starting point to the left end where [THRESHOLD_SPEED] is reached */
     private const val THRESHOLD_DISTANCE = 0.18f
@@ -42,6 +45,10 @@ object DeleteSlider {
     private const val PAUSE_ZONE_WIDTH = 0.233f
     /** where on the way from the threshold to the right end deleting turns into restoring */
     private const val TURN_POSITION = THRESHOLD_SPEED / (THRESHOLD_SPEED + MAX_RESTORE_SPEED)
+    /** part of the way from the threshold to the right end where the speed changes by 0.1 characters per second */
+    private const val SPEED_STEP_WIDTH = 0.1f / (THRESHOLD_SPEED + MAX_RESTORE_SPEED)
+    /** width of each of the [THRESHOLD_SPEED] and [START_SPEED] parts once [FAST_SPEED] was reached */
+    private const val FIXED_SPEED_WIDTH = 2 * SPEED_STEP_WIDTH
     private const val TICK_MS = 16L
     private const val EXPAND_ANIMATION_MS = 180f
 
@@ -63,6 +70,7 @@ object DeleteSlider {
     private var leftEndX = 0f // fastest deletion
     private var rightEndX = 0f // fastest restoring
     private var thresholdReached = false
+    private var fastReached = false
     private var fingerX = 0f
 
     private var activationTime = 0L
@@ -161,6 +169,7 @@ object DeleteSlider {
         anchorX = fingerX.coerceIn(sliderLeft + width * 0.25f, sliderRight)
         thresholdX = anchorX - (anchorX - leftEndX) * THRESHOLD_DISTANCE
         thresholdReached = false
+        fastReached = false
         isActive = true
         activationTime = SystemClock.uptimeMillis()
         lastTickTime = activationTime
@@ -178,7 +187,9 @@ object DeleteSlider {
             thresholdReached = true
             // rises slower at first, so there is fine control at low speeds
             val t = ((thresholdX - x) / max(thresholdX - leftEndX, 1f)).coerceIn(0f, 1f)
-            return THRESHOLD_SPEED + (MAX_DELETE_SPEED - THRESHOLD_SPEED) * t.pow(SPEED_CURVE_EXPONENT)
+            val speed = THRESHOLD_SPEED + (MAX_DELETE_SPEED - THRESHOLD_SPEED) * t.pow(SPEED_CURVE_EXPONENT)
+            if (speed >= FAST_SPEED) fastReached = true
+            return speed
         }
         if (!thresholdReached) {
             if (x >= anchorX) return START_SPEED
@@ -187,9 +198,20 @@ object DeleteSlider {
         }
         // evenly from deleting at the threshold to restoring at the right end
         val t = ((x - thresholdX) / max(rightEndX - thresholdX, 1f)).coerceIn(0f, 1f)
+        if (fastReached && t < RESTORE_START) {
+            // after fast deletion only two short steps before stopping, so stopping is easy
+            return when {
+                t < FIXED_SPEED_WIDTH -> THRESHOLD_SPEED
+                t < 2 * FIXED_SPEED_WIDTH -> START_SPEED
+                else -> 0f
+            }
+        }
         if (kotlin.math.abs(t - TURN_POSITION) < PAUSE_ZONE_WIDTH / 2f) return 0f
         return THRESHOLD_SPEED - (THRESHOLD_SPEED + MAX_RESTORE_SPEED) * t
     }
+
+    /** where on the way from the threshold to the right end restoring starts */
+    private const val RESTORE_START = TURN_POSITION + PAUSE_ZONE_WIDTH / 2f
 
     /** x position of the given part of the way from the threshold to the right end */
     private fun afterThresholdX(t: Float) = thresholdX + (rightEndX - thresholdX) * t
@@ -247,8 +269,8 @@ object DeleteSlider {
         val thumbX = fingerX.coerceIn(left + radius, right - radius)
         // pause zone and restore zone, only exist once the threshold was reached
         val turnX = afterThresholdX(TURN_POSITION)
-        val pauseStartX = afterThresholdX(TURN_POSITION - PAUSE_ZONE_WIDTH / 2f)
-        val restoreStartX = afterThresholdX(TURN_POSITION + PAUSE_ZONE_WIDTH / 2f)
+        val pauseStartX = afterThresholdX(if (fastReached) 2 * FIXED_SPEED_WIDTH else TURN_POSITION - PAUSE_ZONE_WIDTH / 2f)
+        val restoreStartX = afterThresholdX(RESTORE_START)
         if (thresholdReached && pauseStartX < right) {
             canvas.save()
             canvas.clipRect(pauseStartX, top, restoreStartX, bottom)

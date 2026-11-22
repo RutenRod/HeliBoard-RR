@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Prepares the source tree for building the own keyboard variant with a limited set of languages.
+# Prepares the source tree for building RØR, the own keyboard variant with a limited set of languages.
 # Usage: rr/apply-variant.sh pl,en   then   ./gradlew assembleDebug -PrrLanguages=pl,en
 # Sets app name and provider authorities of the debug build (they must differ from other HeliBoard
 # builds installed next to it) and removes the bundled dictionaries of other languages.
 set -euo pipefail
 
 languages="${1:?usage: rr/apply-variant.sh pl,en}"
-app_name="Klawiatura"
+app_name="RØR"
 app_id="helium314.keyboard.rr.debug"
 
 cd "$(dirname "$0")/.."

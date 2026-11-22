@@ -51,18 +51,39 @@ class SwipeTyping(private val context: Context?) {
 
     val hasMainWords: Boolean get() = mainLexicon.size > 0
 
-    fun needsDynamicWordsRefresh(): Boolean =
-        !isLoadingDynamicLexicon.get() && SystemClock.elapsedRealtime() - dynamicLexiconTime > DYNAMIC_REFRESH_INTERVAL_MS
+    @Volatile private var dynamicWordsChanged = true
+
+    /** To be called when a word was learned, so it can be swiped right away. */
+    fun markDynamicWordsChanged() {
+        dynamicWordsChanged = true
+    }
+
+    fun needsDynamicWordsRefresh(): Boolean = !isLoadingDynamicLexicon.get()
+            && (dynamicWordsChanged || SystemClock.elapsedRealtime() - dynamicLexiconTime > DYNAMIC_REFRESH_INTERVAL_MS)
 
     /** Re-reads the words of the changing dictionaries. Must not be called on the main thread. */
     fun refreshDynamicWords(dictionaries: List<Dictionary>) {
         if (!isLoadingDynamicLexicon.compareAndSet(false, true)) return
         try {
+            dynamicWordsChanged = false
             dynamicLexicon = readWords(dictionaries, 2_000)
             dynamicLexiconTime = SystemClock.elapsedRealtime()
         } finally {
             isLoadingDynamicLexicon.set(false)
         }
+    }
+
+    /**
+     *  Frequency on the swipe typing scale for a word of the given dictionary type, null if the word should not be swiped.
+     *  The changing dictionaries use other scales: learned words are at most 160, contacts are always 40.
+     */
+    private fun swipeFrequency(dictType: String, frequency: Int): Int? = when (dictType) {
+        Dictionary.TYPE_USER_HISTORY ->
+            if (frequency <= 0) LEARNED_ONCE_FREQUENCY // seen once, not yet suggested while tapping
+            else LEARNED_MIN_FREQUENCY + LEARNED_FREQUENCY_RANGE * minOf(frequency, MAX_LEARNED_STRENGTH) / MAX_LEARNED_STRENGTH
+        Dictionary.TYPE_CONTACTS -> CONTACT_FREQUENCY
+        Dictionary.TYPE_USER -> maxOf(frequency, PERSONAL_MIN_FREQUENCY)
+        else -> if (frequency > 0) frequency else null
     }
 
     /**
@@ -95,7 +116,9 @@ class SwipeTyping(private val context: Context?) {
         val builder = SwipeLexicon.Builder(expectedWords)
         for (dictionary in dictionaries) {
             try {
-                dictionary.forEachWord { word, frequency -> if (frequency > 0) builder.add(word, frequency) }
+                dictionary.forEachWord { word, frequency ->
+                    swipeFrequency(dictionary.mDictType, frequency)?.let { builder.add(word, it) }
+                }
             } catch (e: Throwable) {
                 Log.w(TAG, "could not read words from ${dictionary.mDictType} dictionary", e)
             }
@@ -147,6 +170,14 @@ class SwipeTyping(private val context: Context?) {
         private const val TAG = "SwipeTyping"
         private const val MAX_CANDIDATES = 24
         private const val DYNAMIC_REFRESH_INTERVAL_MS = 30_000L
+        /** strength of the most used learned words, see ForgettingCurveUtils in native code */
+        const val MAX_LEARNED_STRENGTH = 160
+        // learned words are as likely as fairly common words (about once in 30 000 words or more often)
+        private const val LEARNED_ONCE_FREQUENCY = 150
+        private const val LEARNED_MIN_FREQUENCY = 172
+        private const val LEARNED_FREQUENCY_RANGE = 40
+        private const val CONTACT_FREQUENCY = 165
+        private const val PERSONAL_MIN_FREQUENCY = 185
         // dictionaries are re-used when settings change, no need to read their words again
         private val mainLexiconCache = WeakHashMap<Dictionary, SwipeLexicon>()
 

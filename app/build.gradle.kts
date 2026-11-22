@@ -74,7 +74,7 @@ android {
             }
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    val name = if (rrLanguages.isEmpty()) "HeliBoard" else "Klawiatura"
+                    val name = if (rrLanguages.isEmpty()) "HeliBoard" else "ROR"
                     output.outputFileName = "${name}_${defaultConfig.versionName}-${variant.buildType}.apk"
                 }
             }
