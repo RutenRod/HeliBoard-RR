@@ -565,15 +565,23 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                     && mainDict?.getWordProperty(word, false)?.mIsPossiblyOffensive == true)
                     continue
                 var score = candidate.score - localePenalty
+                // words the user writes are more likely than their general frequency says
+                val learnedStrength = try { historyDict?.getFrequency(word) } catch (_: Exception) { null }
+                    ?: Dictionary.NOT_A_PROBABILITY
+                if (learnedStrength > 0)
+                    score += SWIPE_LEARNED_WORD_BONUS + SWIPE_LEARNED_STRENGTH_BONUS * learnedStrength / 255f
                 if (useContext) {
-                    // a word the user wrote after the previous words before is more likely than its general frequency says
+                    // a word that often follows the previous words is more likely than its general frequency says
                     val learned = historyDict?.getNgramProbability(ngramContext, word) ?: Dictionary.NOT_A_PROBABILITY
-                    val general = mainDict?.getNgramProbability(ngramContext, word) ?: Dictionary.NOT_A_PROBABILITY
-                    val inContext = maxOf(learned, general)
-                    if (inContext > candidate.frequency)
-                        score += (inContext - candidate.frequency) * SwipeDecoder.FREQUENCY_LOG_STEP
                     if (learned != Dictionary.NOT_A_PROBABILITY)
                         score += SWIPE_LEARNED_CONTEXT_BONUS
+                    val general = mainDict?.getNgramProbability(ngramContext, word) ?: Dictionary.NOT_A_PROBABILITY
+                    if (general != Dictionary.NOT_A_PROBABILITY) {
+                        // compare with the frequency in the same dictionary, the candidate frequency uses another scale
+                        val unigram = mainDict?.getFrequency(word) ?: Dictionary.NOT_A_PROBABILITY
+                        if (unigram != Dictionary.NOT_A_PROBABILITY && general > unigram)
+                            score += minOf((general - unigram) * SwipeDecoder.FREQUENCY_LOG_STEP, SWIPE_MAX_CONTEXT_BONUS)
+                    }
                 }
                 suggestionResults.add(SuggestedWordInfo(word, "", SwipeTyping.toSuggestionScore(score),
                     SuggestedWordInfo.KIND_CORRECTION, sourceDict, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE))
@@ -674,6 +682,11 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
         // added to the swipe typing score of a word the user has written after the same previous words before
         private const val SWIPE_LEARNED_CONTEXT_BONUS = 2f
+        // added to the swipe typing score of a word the keyboard learned, the more the stronger the word is
+        private const val SWIPE_LEARNED_WORD_BONUS = 1f
+        private const val SWIPE_LEARNED_STRENGTH_BONUS = 2f
+        // limit for words that often follow the previous words according to the main dictionary
+        private const val SWIPE_MAX_CONTEXT_BONUS = 3f
 
         private fun createSubDict(
             dictType: String, context: Context, locale: Locale, dictFile: File?, dictNamePrefix: String
@@ -762,7 +775,7 @@ private class DictionaryGroup(
 ) {
     private val subDicts: ConcurrentHashMap<String, ExpandableBinaryDictionary> = ConcurrentHashMap(subDicts)
 
-    val swipeTyping = SwipeTyping()
+    val swipeTyping = SwipeTyping(context?.applicationContext)
 
     init {
         loadSwipeWords(mainDict)

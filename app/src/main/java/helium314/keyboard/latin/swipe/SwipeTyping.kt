@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.latin.swipe
 
+import android.content.Context
 import android.os.SystemClock
 import helium314.keyboard.keyboard.Keyboard
 import helium314.keyboard.latin.dictionary.Dictionary
 import helium314.keyboard.latin.utils.Log
+import java.io.IOException
 import java.lang.ref.WeakReference
+import java.util.Locale
+import java.util.zip.GZIPInputStream
 import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -14,7 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *  and decodes swipes against the current keyboard layout.
  *  This is used when no gesture typing library is loaded, and works completely on-device.
  */
-class SwipeTyping {
+class SwipeTyping(private val context: Context?) {
     @Volatile private var mainLexicon = SwipeLexicon.EMPTY
     // words from dictionaries that change while typing: personal dictionary, learned words, contacts
     @Volatile private var dynamicLexicon = SwipeLexicon.EMPTY
@@ -38,7 +42,7 @@ class SwipeTyping {
             return
         }
         val start = SystemClock.elapsedRealtime()
-        val lexicon = readWords(listOf(dictionary), 200_000)
+        val lexicon = readFrequencyAsset(dictionary.mLocale) ?: readWords(listOf(dictionary), 200_000)
         Log.i(TAG, "loaded ${lexicon.size} words for swipe typing in ${SystemClock.elapsedRealtime() - start} ms")
         if (lexicon.size > 0) // empty when the dictionary is not readable yet, don't remember that
             synchronized(mainLexiconCache) { mainLexiconCache[dictionary] = lexicon }
@@ -58,6 +62,32 @@ class SwipeTyping {
             dynamicLexiconTime = SystemClock.elapsedRealtime()
         } finally {
             isLoadingDynamicLexicon.set(false)
+        }
+    }
+
+    /**
+     *  Words of the bundled dictionary with frequencies corrected for swipe typing, see rr/make-swipe-frequencies.py.
+     *  @return null if there is no such file for the locale
+     */
+    private fun readFrequencyAsset(locale: Locale?): SwipeLexicon? {
+        val assets = context?.assets ?: return null
+        if (locale == null) return null
+        val available = try { assets.list("swipe").orEmpty().toSet() } catch (_: IOException) { return null }
+        val name = listOf(locale.toLanguageTag(), locale.language).map { "$it.tsv.gz" }.firstOrNull { it in available }
+            ?: return null
+        return try {
+            val builder = SwipeLexicon.Builder(200_000)
+            GZIPInputStream(assets.open("swipe/$name")).bufferedReader(Charsets.UTF_8).useLines { lines ->
+                for (line in lines) {
+                    val tab = line.indexOf('\t')
+                    if (tab <= 0) continue
+                    builder.add(line.substring(0, tab), line.substring(tab + 1).toIntOrNull() ?: continue)
+                }
+            }
+            builder.build()
+        } catch (e: Exception) {
+            Log.w(TAG, "could not read swipe frequencies $name", e)
+            null
         }
     }
 
